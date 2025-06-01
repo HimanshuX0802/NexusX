@@ -16,6 +16,7 @@ export default function Home() {
   const [selectedServer, setSelectedServer] = useState<Server | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null)
   const [showDirectMessages, setShowDirectMessages] = useState(false)
+  const [isChannelListOpen, setIsChannelListOpen] = useState(true) // Add state for channel list visibility
 
   const handleServerSelect = (server: Server) => {
     setSelectedServer(server)
@@ -32,6 +33,11 @@ export default function Home() {
     setShowDirectMessages(true)
     setSelectedServer(null)
     setSelectedChannel(null)
+  }
+
+  // Handle channel list toggle
+  const handleChannelListToggle = (isOpen: boolean) => {
+    setIsChannelListOpen(isOpen)
   }
 
   // Show loading spinner while checking authentication
@@ -66,12 +72,17 @@ export default function Home() {
         onServerSelect={handleServerSelect}
         onChannelSelect={handleChannelSelect}
         onDirectMessage={handleDirectMessage}
+        onChannelListToggle={handleChannelListToggle} // Pass the toggle handler
       />
 
-      {showDirectMessages ? <DirectMessages /> : <ChatArea channel={selectedChannel} server={selectedServer} />}
+      {showDirectMessages ? (
+        <DirectMessages />
+      ) : (
+        <ChatArea channel={selectedChannel} server={selectedServer} isChannelListOpen={isChannelListOpen} />
+      )}
 
       <IncomingCallDialog />
       <Toaster position="top-right" />
     </div>
   )
-}
+} 

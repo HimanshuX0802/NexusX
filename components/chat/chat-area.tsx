@@ -22,9 +22,10 @@ import { toast } from "sonner"
 interface ChatAreaProps {
   channel: Channel | null
   server: Server | null
+  isChannelListOpen: boolean
 }
 
-export function ChatArea({ channel, server }: ChatAreaProps) {
+export function ChatArea({ channel, server, isChannelListOpen }: ChatAreaProps) {
   const { user } = useAuth()
   const { startCall, isCallActive } = useWebRTC()
   const [messages, setMessages] = useState<Message[]>([])
@@ -37,9 +38,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // Load messages
   useEffect(() => {
     if (!channel) {
       setMessages([])
@@ -66,7 +65,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
     return unsubscribe
   }, [channel])
 
-  // Load users
   useEffect(() => {
     const usersRef = ref(database, "users")
     const unsubscribe = onValue(usersRef, (snapshot) => {
@@ -83,7 +81,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
     return unsubscribe
   }, [])
 
-  // Listen for typing indicators
   useEffect(() => {
     if (!channel) return
 
@@ -107,7 +104,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
     return unsubscribe
   }, [channel, user])
 
-  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
@@ -133,14 +129,13 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       for (const file of attachments) {
         const fileId = Math.random().toString(36).substring(2)
 
-        // Convert image to base64 and store directly
         const base64Url = await uploadImage(file)
 
         uploadedAttachments.push({
           id: fileId,
           name: file.name,
           type: file.type,
-          url: base64Url, // This is now a base64 data URL
+          url: base64Url,
           size: file.size,
         })
       }
@@ -175,7 +170,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
         attachments: uploadedAttachments.length > 0 ? uploadedAttachments : null,
       })
 
-      // Update channel's last message
       const channelRef = ref(database, `channels/${channel.id}/lastMessage`)
       await set(channelRef, {
         content: newMessage.trim() || `${uploadedAttachments.length} attachment(s)`,
@@ -186,7 +180,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       setNewMessage("")
       setAttachments([])
 
-      // Clear typing indicator
       if (user) {
         const typingRef = ref(database, `typing/${channel.id}/${user.uid}`)
         remove(typingRef)
@@ -206,12 +199,10 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       timestamp: Date.now(),
     })
 
-    // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
     }
 
-    // Set new timeout to clear typing indicator
     typingTimeoutRef.current = setTimeout(() => {
       remove(typingRef)
     }, 2000)
@@ -275,20 +266,18 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       return
     }
 
-    // Check permissions first
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: type === "video",
       })
-      stream.getTracks().forEach((track) => track.stop()) // Stop the test stream
+      stream.getTracks().forEach((track) => track.stop())
       console.log("✅ Media permissions OK")
     } catch (error) {
       toast.error("Please allow microphone access")
       return
     }
 
-    // Find another member to call
     const otherMember = server.members.find((id) => id !== user?.uid)
     if (otherMember) {
       console.log("📞 Calling:", otherMember)
@@ -309,23 +298,25 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
     )
   }
 
-  // Show call interface if call is active
   if (isCallActive) {
     return <CallInterface />
   }
 
-  // Render voice channel UI if this is a voice channel
   if (channel.type === "voice") {
     return <VoiceChannel channel={channel} server={server} />
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-700">
+    <div
+      className={`flex-1 flex flex-col bg-gray-700 transition-all duration-300 ease-in-out w-full ${
+        isChannelListOpen ? "ml-16 lg:ml-[304px]" : "ml-16 lg:ml-16"
+      }`}
+    >
       {/* Channel Header */}
-      <div className="p-6 border-b border-gray-600 bg-gray-800 flex justify-between items-center">
+      <div className="p-4 lg:p-6 border-b border-gray-600 bg-gray-800 flex justify-between items-center">
         <div className="flex items-center">
           <span className="text-gray-400 mr-2">#</span>
-          <h2 className="text-xl font-semibold text-white">{channel.name}</h2>
+          <h2 className="text-lg lg:text-xl font-semibold text-white truncate">{channel.name}</h2>
         </div>
 
         <div className="flex space-x-2">
@@ -351,22 +342,22 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-6">
-        <div className="space-y-6">
+      <ScrollArea className="flex-1 p-4 lg:p-6 overflow-x-hidden">
+        <div className="space-y-4 lg:space-y-6">
           {messages.map((message) => {
             const author = users[message.authorId]
             const isOwn = message.authorId === user?.uid
 
             return (
-              <div key={message.id} className="group flex items-start space-x-4">
-                <Avatar className="h-10 w-10">
+              <div key={message.id} className="group flex items-start space-x-3 lg:space-x-4">
+                <Avatar className="h-8 w-8 lg:h-10 lg:w-10 flex-shrink-0">
                   <AvatarImage src={author?.photoURL || "/placeholder.svg"} />
                   <AvatarFallback>{author?.displayName?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-white">{author?.displayName || "Unknown User"}</span>
+                    <span className="font-semibold text-white text-sm lg:text-base">{author?.displayName || "Unknown User"}</span>
                     <span className="text-xs text-gray-400">{formatTime(message.timestamp)}</span>
                     {message.edited && (
                       <Badge variant="secondary" className="text-xs">
@@ -385,7 +376,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                             editMessage(message.id)
                           }
                         }}
-                        className="flex-1"
+                        className="flex-1 text-sm"
                       />
                       <Button size="sm" onClick={() => editMessage(message.id)}>
                         Save
@@ -403,31 +394,30 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                     </div>
                   ) : (
                     <>
-                      {message.content && <p className="text-gray-300 mt-2">{message.content}</p>}
+                      {message.content && <p className="text-gray-300 mt-1 lg:mt-2 text-sm lg:text-base break-words">{message.content}</p>}
 
-                      {/* Attachments */}
                       {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-3 space-y-3">
+                        <div className="mt-2 lg:mt-3 space-y-2 lg:space-y-3">
                           {message.attachments.map((attachment) => (
                             <div
                               key={attachment.id}
-                              className="rounded-md overflow-hidden bg-gray-800 border border-gray-600"
+                              className="rounded-md overflow-hidden bg-gray-800 border border-gray-600 w-full"
                             >
                               {isImageFile(attachment.type) ? (
                                 <div className="relative">
                                   <img
                                     src={attachment.url || "/placeholder.svg"}
                                     alt={attachment.name}
-                                    className="max-h-80 max-w-full object-contain"
-                                    style={{ maxWidth: "400px" }}
+                                    className="max-h-80 w-full object-contain"
+                                    style={{ maxWidth: "100%", height: "auto" }}
                                   />
-                                  <div className="absolute bottom-2 right-2 bg-gray-900 bg-opacity-70 p-1 rounded text-xs text-white">
+                                  <div className="absolute bottom-1 lg:bottom-2 right-1 lg:right-2 bg-gray-900 bg-opacity-70 p-1 rounded text-xs text-white truncate max-w-[150px]">
                                     {attachment.name}
                                   </div>
                                 </div>
                               ) : (
-                                <div className="p-4 flex items-center">
-                                  <File className="h-8 w-8 text-blue-400 mr-3" />
+                                <div className="p-3 lg:p-4 flex items-center">
+                                  <File className="h-6 w-6 lg:h-8 lg:w-8 text-blue-400 mr-2 lg:mr-3 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm text-white truncate">{attachment.name}</p>
                                     <p className="text-xs text-gray-400">{formatFileSize(attachment.size)}</p>
@@ -443,7 +433,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                 </div>
 
                 {isOwn && editingMessage !== message.id && (
-                  <div className="opacity-0 group-hover:opacity-100 flex space-x-1">
+                  <div className="opacity-0 group-hover:opacity-100 flex space-x-1 flex-shrink-0">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -469,7 +459,6 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
             )
           })}
 
-          {/* Typing Indicators */}
           {typingUsers.length > 0 && (
             <div className="flex items-center space-x-2 text-gray-400 text-sm">
               <div className="flex space-x-1">
@@ -477,7 +466,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
               </div>
-              <span>
+              <span className="truncate">
                 {typingUsers.map((indicator) => users[indicator.userId]?.displayName).join(", ")}
                 {typingUsers.length === 1 ? " is" : " are"} typing...
               </span>
@@ -488,22 +477,21 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
         </div>
       </ScrollArea>
 
-      {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="px-6 py-2 border-t border-gray-600 bg-gray-800">
+        <div className="px-4 lg:px-6 py-2 border-t border-gray-600 bg-gray-800">
           <div className="flex flex-wrap gap-2">
             {attachments.map((file, index) => (
-              <div key={index} className="relative bg-gray-700 rounded-md p-2 flex items-center">
+              <div key={index} className="relative bg-gray-700 rounded-md p-2 flex items-center max-w-[200px]">
                 {file.type.startsWith("image/") ? (
-                  <ImageIcon className="h-4 w-4 mr-2 text-blue-400" />
+                  <ImageIcon className="h-4 w-4 mr-2 text-blue-400 flex-shrink-0" />
                 ) : (
-                  <File className="h-4 w-4 mr-2 text-blue-400" />
+                  <File className="h-4 w-4 mr-2 text-blue-400 flex-shrink-0" />
                 )}
-                <span className="text-sm text-gray-300 truncate max-w-[150px]">{file.name}</span>
+                <span className="text-sm text-gray-300 truncate flex-1">{file.name}</span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5 ml-1 text-gray-400 hover:text-white"
+                  className="h-5 w-5 ml-1 text-gray-400 hover:text-white flex-shrink-0"
                   onClick={() => removeAttachment(index)}
                 >
                   <X className="h-3 w-3" />
@@ -514,16 +502,15 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
         </div>
       )}
 
-      {/* Message Input */}
-      <div className="p-6 border-t border-gray-600">
-        <div className="flex items-center space-x-3">
+      <div className="p-4 lg:p-6 border-t border-gray-600">
+        <div className="flex items-center space-x-2 lg:space-x-3">
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 text-gray-400 hover:text-white"
+            className="h-8 w-8 lg:h-10 lg:w-10 text-gray-400 hover:text-white flex-shrink-0"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Paperclip className="h-5 w-5" />
+            <Paperclip className="h-4 w-4 lg:h-5 lg:w-5" />
           </Button>
           <input
             type="file"
@@ -547,7 +534,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                 sendMessage()
               }
             }}
-            className="flex-1 bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+            className="flex-1 bg-gray-600 border-gray-500 text-white placeholder-gray-400 text-sm lg:text-base"
             disabled={uploading}
           />
           <Button onClick={sendMessage} disabled={(!newMessage.trim() && attachments.length === 0) || uploading}>

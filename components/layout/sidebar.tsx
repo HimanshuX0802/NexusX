@@ -226,7 +226,7 @@ export function Sidebar({
       {/* Server List - Always Visible */}
       <div className="fixed inset-y-0 left-0 w-16 bg-gray-900 flex flex-col items-center py-3 space-y-2 z-50">
         <button onClick={toggleChannelList} className="w-12 h-12 mb-2 focus:outline-none" aria-label="Toggle Channel List">
-          <img src="https://preview.redd.it/g6003su6ug9e1.png?auto=webp&s=e13cb3bd1fda95d043e11869b802d17bc4148d9b" alt="Website Logo" className="w-full h-full object-contain" />
+          <img src="https://preview.redd.it/kkte2v8jed4f1.png?auto=webp&s=f7e709800268b9f7b9ce587a625a392949b31e36" alt="Website Logo" className="w-full h-full object-contain" />
         </button>
 
         <Button
