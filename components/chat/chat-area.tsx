@@ -291,7 +291,8 @@ export function ChatArea({ channel, server, isChannelListOpen }: ChatAreaProps) 
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-700">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome to Nexus X</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">Welcome to NexusX</h2>
+          <p className="text-gray-400">Himanshu Singh</p>
           <p className="text-gray-400">Select a channel to start chatting</p>
         </div>
       </div>

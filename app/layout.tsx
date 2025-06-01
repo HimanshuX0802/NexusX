@@ -6,9 +6,9 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Nexus X - Discord Clone",
+  title: "NexusX - Discord Clone",
   description: "A modern Discord clone built with Next.js and Firebase",
-    generator: 'v0.dev'
+    generator: 'Himanshu'
 }
 
 export default function RootLayout({
