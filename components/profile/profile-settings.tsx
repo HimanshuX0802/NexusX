@@ -1,15 +1,17 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { ref, set } from "firebase/database"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Camera, Upload } from "lucide-react"
+import { Camera } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
+import { uploadImage } from "@/lib/imageStorage"
+import { database } from "@/lib/firebase"
 import { toast } from "sonner"
 
 interface ProfileSettingsProps {
@@ -17,7 +19,7 @@ interface ProfileSettingsProps {
 }
 
 export function ProfileSettings({ onClose }: ProfileSettingsProps) {
-  const { user, updateUserProfile, updateStatus } = useAuth()
+  const { user, updateStatus } = useAuth()
   const [displayName, setDisplayName] = useState(user?.displayName || "")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -30,12 +32,10 @@ export function ProfileSettings({ onClose }: ProfileSettingsProps) {
         toast.error("File size must be less than 5MB")
         return
       }
-
       if (!file.type.startsWith("image/")) {
         toast.error("Please select an image file")
         return
       }
-
       setSelectedFile(file)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
@@ -43,6 +43,7 @@ export function ProfileSettings({ onClose }: ProfileSettingsProps) {
   }
 
   const handleSave = async () => {
+    if (!user) return
     if (!displayName.trim()) {
       toast.error("Display name is required")
       return
@@ -50,13 +51,32 @@ export function ProfileSettings({ onClose }: ProfileSettingsProps) {
 
     setLoading(true)
     try {
-      await updateUserProfile(displayName, selectedFile || undefined)
+      let photoURL = user.photoURL || null
+      if (selectedFile) {
+        // Upload the profile picture and get base64 URL
+        photoURL = await uploadImage(selectedFile)
+      }
+
+      // Update user profile in Firebase Realtime Database
+      const userRef = ref(database, `users/${user.uid}`)
+      await set(userRef, {
+        displayName,
+        email: user.email,
+        photoURL,
+        status: user.status || "online",
+      })
+
       toast.success("Profile updated successfully!")
       onClose()
     } catch (error) {
       toast.error("Failed to update profile")
     } finally {
       setLoading(false)
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      setSelectedFile(null)
+      setPreviewUrl(null)
     }
   }
 
@@ -143,10 +163,7 @@ export function ProfileSettings({ onClose }: ProfileSettingsProps) {
       <div className="flex space-x-3 pt-4">
         <Button onClick={handleSave} disabled={loading} className="flex-1">
           {loading ? (
-            <>
-              <Upload className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
-            </>
+            <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2" />
           ) : (
             "Save Changes"
           )}
