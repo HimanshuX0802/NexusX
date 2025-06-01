@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Hash, Users, LogOut, Volume2, MessageSquare, User } from "lucide-react"
+import { Plus, Hash, Users, LogOut, Volume2, MessageSquare, User, X } from "lucide-react"
 import { database } from "@/lib/firebase"
 import { useAuth } from "@/hooks/useAuth"
 import { ProfileSettings } from "@/components/profile/profile-settings"
@@ -22,6 +22,7 @@ interface SidebarProps {
   onServerSelect: (server: Server) => void
   onChannelSelect: (channel: Channel) => void
   onDirectMessage: () => void
+  onChannelListToggle?: (isOpen: boolean) => void
 }
 
 export function Sidebar({
@@ -30,6 +31,7 @@ export function Sidebar({
   onServerSelect,
   onChannelSelect,
   onDirectMessage,
+  onChannelListToggle,
 }: SidebarProps) {
   const { user, logout } = useAuth()
   const [servers, setServers] = useState<Server[]>([])
@@ -42,8 +44,15 @@ export function Sidebar({
   const [channelName, setChannelName] = useState("")
   const [channelType, setChannelType] = useState<"text" | "voice">("text")
   const [inviteCode, setInviteCode] = useState("")
+  const [isChannelListOpen, setIsChannelListOpen] = useState(true)
 
-  // Load user's servers
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log("selectedServer:", selectedServer)
+    console.log("isChannelListOpen:", isChannelListOpen)
+  }, [selectedServer, isChannelListOpen])
+
+  // Load servers
   useEffect(() => {
     if (!user) return
 
@@ -63,10 +72,10 @@ export function Sidebar({
       }
     })
 
-    return unsubscribe
+    return () => unsubscribe()
   }, [user])
 
-  // Load channels for selected server
+  // Load channels
   useEffect(() => {
     if (!selectedServer) {
       setChannels([])
@@ -84,11 +93,9 @@ export function Sidebar({
           }))
           .filter((channel: Channel) => channel.serverId === selectedServer.id)
           .sort((a, b) => {
-            // Sort by type first (text channels first, then voice)
             if (a.type !== b.type) {
               return a.type === "text" ? -1 : 1
             }
-            // Then sort by creation date
             return a.createdAt - b.createdAt
           })
         setChannels(serverChannels)
@@ -97,7 +104,7 @@ export function Sidebar({
       }
     })
 
-    return unsubscribe
+    return () => unsubscribe()
   }, [selectedServer])
 
   const createServer = async () => {
@@ -118,7 +125,6 @@ export function Sidebar({
 
       await set(newServerRef, serverData)
 
-      // Create a general channel
       const channelsRef = ref(database, "channels")
       const newChannelRef = push(channelsRef)
       await set(newChannelRef, {
@@ -170,7 +176,6 @@ export function Sidebar({
         return
       }
 
-      // Add user to server members
       const updatedMembers = serverToJoin.members ? [...serverToJoin.members, user.uid] : [user.uid]
       const serverRef = ref(database, `servers/${serverId}/members`)
       await set(serverRef, updatedMembers)
@@ -208,10 +213,22 @@ export function Sidebar({
     }
   }
 
+  const toggleChannelList = () => {
+    setIsChannelListOpen((prev) => {
+      const newState = !prev
+      onChannelListToggle?.(newState)
+      return newState
+    })
+  }
+
   return (
     <div className="flex h-full">
-      {/* Server List */}
-      <div className="w-16 bg-gray-900 flex flex-col items-center py-3 space-y-2">
+      {/* Server List - Always Visible */}
+      <div className="fixed inset-y-0 left-0 w-16 bg-gray-900 flex flex-col items-center py-3 space-y-2 z-50">
+        <button onClick={toggleChannelList} className="w-12 h-12 mb-2 focus:outline-none" aria-label="Toggle Channel List">
+          <img src="https://preview.redd.it/g6003su6ug9e1.png?auto=webp&s=e13cb3bd1fda95d043e11869b802d17bc4148d9b" alt="Website Logo" className="w-full h-full object-contain" />
+        </button>
+
         <Button
           variant="ghost"
           size="icon"
@@ -235,7 +252,10 @@ export function Sidebar({
                     ? "bg-purple-600 text-white"
                     : "bg-gray-700 hover:bg-gray-600 text-gray-300"
                 }`}
-                onClick={() => onServerSelect(server)}
+                onClick={() => {
+                  onServerSelect(server)
+                  setIsChannelListOpen(true)
+                }}
               >
                 <span className="text-sm font-semibold">{server.name.charAt(0).toUpperCase()}</span>
               </Button>
@@ -290,154 +310,196 @@ export function Sidebar({
         </ScrollArea>
       </div>
 
-      {/* Channel List */}
-      {selectedServer && (
-        <div className="w-60 bg-gray-800 flex flex-col">
-          <div className="p-4 border-b border-gray-700">
-            <h2 className="font-semibold text-white">{selectedServer.name}</h2>
-            <p className="text-sm text-gray-400">Invite: {selectedServer.inviteCode}</p>
-          </div>
+      {/* Channel List - Collapsible on Mobile */}
+      <div className="relative flex h-full">
+        {selectedServer ? (
+          <div
+            className={`fixed inset-y-0 left-16 z-30 w-60 bg-gray-800 flex flex-col transform transition-transform duration-300 ease-in-out ${
+              isChannelListOpen ? "translate-x-0 shadow-lg" : "-translate-x-full"
+            } lg:static lg:translate-x-0 lg:w-60 lg:left-16 lg:pl-16 lg:shadow-none`}
+          >
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center space-x-2 pt-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-white truncate">{selectedServer.name}</h2>
+                <p className="text-sm text-gray-400 truncate">Invite: {selectedServer.inviteCode}</p>
+              </div>
+              <button onClick={toggleChannelList} className="lg:hidden flex-shrink-0" aria-label="Close Channel List">
+                <X className="h-6 w-6 text-white" />
+              </button>
+            </div>
 
-          <ScrollArea className="flex-1">
-            <div className="p-2">
-              {/* Text Channels */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase">Text Channels</span>
+            <ScrollArea className="flex-1">
+              <div className="p-2">
+                {/* Text Channels */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400 uppercase">Text Channels</span>
+                  </div>
+
+                  {channels
+                    .filter((channel) => channel.type === "text")
+                    .map((channel) => (
+                      <Button
+                        key={channel.id}
+                        variant="ghost"
+                        className={`w-full justify-start text-left mb-1 ${
+                          selectedChannel?.id === channel.id
+                            ? "bg-gray-700 text-white"
+                            : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                        }`}
+                        onClick={() => {
+                          onChannelSelect(channel)
+                          setIsChannelListOpen(false)
+                        }}
+                      >
+                        <Hash className="h-4 w-4 mr-2" />
+                        {channel.name}
+                      </Button>
+                    ))}
                 </div>
 
-                {channels
-                  .filter((channel) => channel.type === "text")
-                  .map((channel) => (
-                    <Button
-                      key={channel.id}
-                      variant="ghost"
-                      className={`w-full justify-start text-left mb-1 ${
-                        selectedChannel?.id === channel.id
-                          ? "bg-gray-700 text-white"
-                          : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                      }`}
-                      onClick={() => onChannelSelect(channel)}
-                    >
-                      <Hash className="h-4 w-4 mr-2" />
-                      {channel.name}
-                    </Button>
-                  ))}
-              </div>
+                {/* Voice Channels */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400 uppercase">Voice Channels</span>
+                  </div>
 
-              {/* Voice Channels */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase">Voice Channels</span>
+                  {channels
+                    .filter((channel) => channel.type === "voice")
+                    .map((channel) => (
+                      <Button
+                        key={channel.id}
+                        variant="ghost"
+                        className={`w-full justify-start text-left mb-1 ${
+                          selectedChannel?.id === channel.id
+                            ? "bg-gray-700 text-white"
+                            : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                        }`}
+                        onClick={() => {
+                          onChannelSelect(channel)
+                          setIsChannelListOpen(false)
+                        }}
+                      >
+                        <Volume2 className="h-4 w-4 mr-2" />
+                        {channel.name}
+                        {channel.activeUsers && channel.activeUsers.length > 0 && (
+                          <Badge variant="secondary" className="ml-2 bg-green-600 text-white">
+                            {channel.activeUsers.length}
+                          </Badge>
+                        )}
+                      </Button>
+                    ))}
                 </div>
 
-                {channels
-                  .filter((channel) => channel.type === "voice")
-                  .map((channel) => (
+                {/* Create Channel Button */}
+                <Dialog open={showCreateChannel} onOpenChange={setShowCreateChannel}>
+                  <DialogTrigger asChild>
                     <Button
-                      key={channel.id}
                       variant="ghost"
-                      className={`w-full justify-start text-left mb-1 ${
-                        selectedChannel?.id === channel.id
-                          ? "bg-gray-700 text-white"
-                          : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                      }`}
-                      onClick={() => onChannelSelect(channel)}
+                      className="w-full justify-start text-left mt-2 text-gray-400 hover:text-white"
                     >
-                      <Volume2 className="h-4 w-4 mr-2" />
-                      {channel.name}
-                      {channel.activeUsers && channel.activeUsers.length > 0 && (
-                        <Badge variant="secondary" className="ml-2 bg-green-600 text-white">
-                          {channel.activeUsers.length}
-                        </Badge>
-                      )}
-                    </Button>
-                  ))}
-              </div>
-
-              {/* Create Channel Button */}
-              <Dialog open={showCreateChannel} onOpenChange={setShowCreateChannel}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-left mt-2 text-gray-400 hover:text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Channel
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Channel</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <Input
-                      placeholder="Channel name"
-                      value={channelName}
-                      onChange={(e) => setChannelName(e.target.value)}
-                    />
-
-                    <Tabs defaultValue="text" onValueChange={(value) => setChannelType(value as "text" | "voice")}>
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="text">
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Text Channel
-                        </TabsTrigger>
-                        <TabsTrigger value="voice">
-                          <Volume2 className="h-4 w-4 mr-2" />
-                          Voice Channel
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-
-                    <Button onClick={createChannel} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
                       Create Channel
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </ScrollArea>
-
-          {/* User Panel */}
-          <div className="p-3 bg-gray-900 border-t border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.photoURL || "/placeholder.svg"} />
-                  <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{user?.displayName}</p>
-                  <p className="text-xs text-gray-400">
-                    <Badge variant="secondary" className="bg-green-600 text-white">
-                      Online
-                    </Badge>
-                  </p>
-                </div>
-              </div>
-              <div className="flex space-x-1">
-                <Dialog open={showSettings} onOpenChange={setShowSettings}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white">
-                      <User className="h-4 w-4" />
-                    </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
+                  <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Profile Settings</DialogTitle>
+                      <DialogTitle>Create Channel</DialogTitle>
                     </DialogHeader>
-                    <ProfileSettings onClose={() => setShowSettings(false)} />
+                    <div className="space-y-4">
+                      <Input
+                        placeholder="Channel name"
+                        value={channelName}
+                        onChange={(e) => setChannelName(e.target.value)}
+                      />
+
+                      <Tabs defaultValue="text" onValueChange={(value) => setChannelType(value as "text" | "voice")}>
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="text">
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Text Channel
+                          </TabsTrigger>
+                          <TabsTrigger value="voice">
+                            <Volume2 className="h-4 w-4 mr-2" />
+                            Voice Channel
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+
+                      <Button onClick={createChannel} className="w-full">
+                        Create Channel
+                      </Button>
+                    </div>
                   </DialogContent>
                 </Dialog>
+              </div>
+            </ScrollArea>
 
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={logout}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
+            {/* User Panel */}
+            <div className="p-3 bg-gray-900 border-t border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.photoURL || "/placeholder.svg"} />
+                    <AvatarFallback>{user?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{user?.displayName}</p>
+                    <div className="text-xs text-gray-400">
+                      <Badge variant="secondary" className="bg-green-600 text-white">
+                        Online
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex space-x-1">
+                  <Dialog open={showSettings} onOpenChange={setShowSettings}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white">
+                        <User className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Profile Settings</DialogTitle>
+                      </DialogHeader>
+                      <ProfileSettings onClose={() => setShowSettings(false)} />
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white" onClick={logout}>
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className={`fixed inset-y-0 left-16 z-30 w-60 bg-gray-800 flex flex-col transform transition-transform duration-300 ease-in-out ${
+              isChannelListOpen ? "translate-x-0 shadow-lg" : "-translate-x-full"
+            } lg:static lg:translate-x-0 lg:w-60 lg:left-16 lg:pl-16 lg:shadow-none`}
+          >
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center space-x-2 pt-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-white truncate">No Server Selected</h2>
+                <p className="text-sm text-gray-400 truncate">Select a server to view channels</p>
+              </div>
+              <button onClick={toggleChannelList} className="lg:hidden flex-shrink-0" aria-label="Close Channel List">
+                <X className="h-6 w-6 text-white" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Overlay (Mobile Only) */}
+      {isChannelListOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={toggleChannelList}
+          aria-hidden="true"
+        ></div>
       )}
     </div>
   )

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Send, Plus, Phone, Video, Paperclip } from "lucide-react"
+import { Send, Plus, Phone, Video, Paperclip, X, Users } from "lucide-react"
 import { database } from "@/lib/firebase"
 import { useAuth } from "@/hooks/useAuth"
 import { useWebRTC } from "@/hooks/useWebRTC"
@@ -24,6 +24,12 @@ export function DirectMessages() {
   const [newMessage, setNewMessage] = useState("")
   const [showNewDM, setShowNewDM] = useState(false)
   const [searchEmail, setSearchEmail] = useState("")
+  const [isConversationListOpen, setIsConversationListOpen] = useState(true)
+
+  // Reset the conversation list sidebar to be open when the component mounts
+  useEffect(() => {
+    setIsConversationListOpen(true)
+  }, [])
 
   // Load all users
   useEffect(() => {
@@ -60,7 +66,6 @@ export function DirectMessages() {
           .filter((message: DirectMessage) => message.senderId === user.uid || message.receiverId === user.uid)
           .sort((a, b) => a.timestamp - b.timestamp)
 
-        // Group messages by conversation
         const grouped: Record<string, DirectMessage[]> = {}
         userMessages.forEach((message) => {
           const otherUserId = message.senderId === user.uid ? message.receiverId : message.senderId
@@ -138,18 +143,30 @@ export function DirectMessages() {
     }
   }
 
-  // Show call interface if call is active
+  const toggleConversationList = () => {
+    setIsConversationListOpen((prev) => !prev)
+  }
+
+  const handleConversationSelect = (userId: string) => {
+    setSelectedUser(userId)
+    setIsConversationListOpen(false) // Collapse the sidebar on mobile after selection
+  }
+
   if (isCallActive) {
     return <CallInterface />
   }
 
   return (
     <div className="flex h-full">
-      {/* Conversations List */}
-      <div className="w-60 bg-gray-800 border-r border-gray-700">
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-white">Direct Messages</h2>
+      {/* Conversations List - Collapsible */}
+      <div
+        className={`fixed inset-y-0 left-16 z-30 w-60 bg-gray-800 border-r border-gray-700 flex flex-col transform transition-transform duration-300 ease-in-out ${
+          isConversationListOpen ? "translate-x-0 shadow-lg" : "-translate-x-full"
+        } lg:static lg:translate-x-0 lg:w-60 lg:shadow-none`}
+      >
+        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+          <h2 className="font-semibold text-white">Direct Messages</h2>
+          <div className="flex items-center space-x-2">
             <Dialog open={showNewDM} onOpenChange={setShowNewDM}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-white">
@@ -172,6 +189,14 @@ export function DirectMessages() {
                 </div>
               </DialogContent>
             </Dialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-gray-400 hover:text-white lg:hidden"
+              onClick={toggleConversationList}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -192,7 +217,7 @@ export function DirectMessages() {
                       ? "bg-gray-700 text-white"
                       : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
-                  onClick={() => setSelectedUser(userId)}
+                  onClick={() => handleConversationSelect(userId)}
                 >
                   <Avatar className="h-8 w-8 mr-3">
                     <AvatarImage src={otherUser.photoURL || "/placeholder.svg"} />
@@ -210,13 +235,24 @@ export function DirectMessages() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-700">
+      <div
+        className={`flex-1 flex flex-col bg-gray-700 transition-all duration-300 ease-in-out ${
+          isConversationListOpen ? "ml-16 lg:ml-[304px]" : "ml-16 lg:ml-16"
+        }`}
+      >
         {selectedUser ? (
           <>
-            {/* Header */}
             <div className="p-4 border-b border-gray-600 bg-gray-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-400 hover:text-white mr-2 lg:hidden"
+                    onClick={toggleConversationList}
+                  >
+                    <Users className="h-4 w-4" />
+                  </Button>
                   <Avatar className="h-8 w-8 mr-3">
                     <AvatarImage src={users[selectedUser]?.photoURL || "/placeholder.svg"} />
                     <AvatarFallback>{users[selectedUser]?.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
@@ -246,7 +282,6 @@ export function DirectMessages() {
               </div>
             </div>
 
-            {/* Messages */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {(conversations[selectedUser] || []).map((message) => {
@@ -268,7 +303,6 @@ export function DirectMessages() {
               </div>
             </ScrollArea>
 
-            {/* Message Input */}
             <div className="p-4 border-t border-gray-600">
               <div className="flex items-center space-x-2">
                 <Button
@@ -297,14 +331,53 @@ export function DirectMessages() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Direct Messages</h2>
-              <p className="text-gray-400">Select a conversation to start chatting</p>
+          <div className="flex-1 flex items-center justify-center bg-gray-700">
+            <div className="text-center bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-white mb-4 lg:hidden"
+                onClick={toggleConversationList}
+              >
+                <Users className="h-6 w-6" />
+              </Button>
+              <h2 className="text-2xl font-bold text-white mb-3">Direct Messages</h2>
+              <p className="text-gray-300 mb-4">Select a conversation to start chatting, or start a new one!</p>
+              <Dialog open={showNewDM} onOpenChange={setShowNewDM}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="bg-purple-600 text-white hover:bg-purple-700">
+                    Start a New Conversation
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Start a conversation</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Enter user email"
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                    />
+                    <Button onClick={startNewConversation} className="w-full">
+                      Start Conversation
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         )}
       </div>
+
+      {/* Overlay (Mobile Only) */}
+      {isConversationListOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={toggleConversationList}
+          aria-hidden="true"
+        ></div>
+      )}
     </div>
   )
 }

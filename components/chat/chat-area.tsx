@@ -322,7 +322,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
   return (
     <div className="flex-1 flex flex-col bg-gray-700">
       {/* Channel Header */}
-      <div className="p-4 border-b border-gray-600 bg-gray-800 flex justify-between items-center">
+      <div className="p-6 border-b border-gray-600 bg-gray-800 flex justify-between items-center">
         <div className="flex items-center">
           <span className="text-gray-400 mr-2">#</span>
           <h2 className="text-xl font-semibold text-white">{channel.name}</h2>
@@ -351,14 +351,14 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 p-6">
+        <div className="space-y-6">
           {messages.map((message) => {
             const author = users[message.authorId]
             const isOwn = message.authorId === user?.uid
 
             return (
-              <div key={message.id} className="group flex items-start space-x-3">
+              <div key={message.id} className="group flex items-start space-x-4">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={author?.photoURL || "/placeholder.svg"} />
                   <AvatarFallback>{author?.displayName?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
@@ -376,7 +376,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                   </div>
 
                   {editingMessage === message.id ? (
-                    <div className="mt-1 flex items-center space-x-2">
+                    <div className="mt-2 flex items-center space-x-2">
                       <Input
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
@@ -403,11 +403,11 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                     </div>
                   ) : (
                     <>
-                      {message.content && <p className="text-gray-300 mt-1">{message.content}</p>}
+                      {message.content && <p className="text-gray-300 mt-2">{message.content}</p>}
 
                       {/* Attachments */}
                       {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-3 space-y-3">
                           {message.attachments.map((attachment) => (
                             <div
                               key={attachment.id}
@@ -426,7 +426,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="p-3 flex items-center">
+                                <div className="p-4 flex items-center">
                                   <File className="h-8 w-8 text-blue-400 mr-3" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm text-white truncate">{attachment.name}</p>
@@ -490,7 +490,7 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
 
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-600 bg-gray-800">
+        <div className="px-6 py-2 border-t border-gray-600 bg-gray-800">
           <div className="flex flex-wrap gap-2">
             {attachments.map((file, index) => (
               <div key={index} className="relative bg-gray-700 rounded-md p-2 flex items-center">
@@ -515,8 +515,8 @@ export function ChatArea({ channel, server }: ChatAreaProps) {
       )}
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-600">
-        <div className="flex items-center space-x-2">
+      <div className="p-6 border-t border-gray-600">
+        <div className="flex items-center space-x-3">
           <Button
             variant="ghost"
             size="icon"
